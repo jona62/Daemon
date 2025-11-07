@@ -3,7 +3,15 @@
 from .daemon import TaskDaemon
 from .client import DaemonClient
 from .config import DaemonConfig
-from .core import task_handler
+from .core import task_handler, Queue, PersistentQueue, MemoryQueue
 
 __version__ = "0.1.0"
-__all__ = ["TaskDaemon", "DaemonClient", "DaemonConfig", "task_handler"]
+__all__ = [
+    "TaskDaemon",
+    "DaemonClient",
+    "DaemonConfig",
+    "task_handler",
+    "Queue",
+    "PersistentQueue",
+    "MemoryQueue",
+]

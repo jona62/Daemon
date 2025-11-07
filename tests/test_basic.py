@@ -30,6 +30,7 @@ def daemon(config):
     """Test daemon instance."""
     clear_handlers()  # Clear any existing handlers
     from prometheus_client import CollectorRegistry
+
     registry = CollectorRegistry()  # Use separate registry for each test
     return TaskDaemon(config, metrics_registry=registry)
 
@@ -105,19 +106,19 @@ def test_queue_new_features(daemon):
     # Test redrive_task
     task_id = queue.enqueue("test_type", {"data": "test"})
     queue.mark_failed(task_id, "Test error", max_retries=0)  # Force to failed
-    
+
     task_details = queue.get_task(task_id)
     assert task_details["status"] == "failed"
-    
+
     assert queue.redrive_task(task_id) is True
     task_details = queue.get_task(task_id)
     assert task_details["status"] == "pending"
     assert task_details["last_error"] is None
 
 
-@patch('requests.get')
-@patch('requests.post')
-@patch('requests.delete')
+@patch("requests.get")
+@patch("requests.post")
+@patch("requests.delete")
 def test_client_new_methods(mock_delete, mock_post, mock_get):
     """Test new client methods."""
     client = DaemonClient("http://localhost:8080")
@@ -125,7 +126,7 @@ def test_client_new_methods(mock_delete, mock_post, mock_get):
     # Test get_task
     mock_get.return_value.status_code = 200
     mock_get.return_value.json.return_value = {"id": 1, "status": "completed"}
-    
+
     task = client.get_task(1)
     assert task["id"] == 1
     assert task["status"] == "completed"
@@ -151,7 +152,9 @@ def test_client_new_methods(mock_delete, mock_post, mock_get):
     mock_post.return_value.status_code = 200
     result = client.redrive_task(1)
     assert result is True
-    mock_post.assert_called_with("http://localhost:8080/api/tasks/1/redrive", timeout=0.1)
+    mock_post.assert_called_with(
+        "http://localhost:8080/api/tasks/1/redrive", timeout=0.1
+    )
 
     # Test redrive_task failure
     mock_post.return_value.status_code = 404
@@ -162,12 +165,12 @@ def test_client_new_methods(mock_delete, mock_post, mock_get):
 def test_mark_complete_with_result(daemon):
     """Test marking tasks complete with results."""
     queue = daemon.queue
-    
+
     task_id = queue.enqueue("test_type", {"data": "test"})
     result = {"status": "success", "processed_items": 5}
-    
+
     queue.mark_complete(task_id, result)
-    
+
     task_details = queue.get_task(task_id)
     assert task_details["status"] == "completed"
     assert task_details["result"] is not None
@@ -177,19 +180,42 @@ def test_mark_complete_with_result(daemon):
 def test_database_cleanup_on_init():
     """Test that database is cleaned on initialization."""
     from prometheus_client import CollectorRegistry
+
     db_path = "/tmp/test_cleanup.db"
-    
+
     # Create a database with some data
     config1 = DaemonConfig(db_path=db_path)
     daemon1 = TaskDaemon(config1, metrics_registry=CollectorRegistry())
     task_id = daemon1.queue.enqueue("test", {"data": "test"})
     assert daemon1.queue.get_task(task_id) is not None
-    
+
     # Create new daemon - should clean database
     config2 = DaemonConfig(db_path=db_path)
     daemon2 = TaskDaemon(config2, metrics_registry=CollectorRegistry())
     assert daemon2.queue.get_task(task_id) is None  # Should be gone
-    
-    # Cleanup
-    if os.path.exists(db_path):
-        os.remove(db_path)
+
+
+def test_memory_queue_implementation():
+    """Test that daemon works with different queue implementations."""
+    from prometheus_client import CollectorRegistry
+    from task_daemon.core import MemoryQueue
+
+    config = DaemonConfig(port=8082)
+    memory_queue = MemoryQueue()
+    daemon = TaskDaemon(
+        config, metrics_registry=CollectorRegistry(), queue=memory_queue
+    )
+
+    # Test basic queue operations
+    task_id = daemon.queue.enqueue("test_type", {"data": "test"})
+    assert task_id == 1  # Memory queue starts at 1
+
+    task = daemon.queue.dequeue()
+    assert task is not None
+    assert task[1] == "test_type"
+
+    # Test new features work with memory queue
+    daemon.queue.mark_complete(task_id, {"result": "success"})
+    task_details = daemon.queue.get_task(task_id)
+    assert task_details["status"] == "completed"
+    assert task_details["result"]["result"] == "success"

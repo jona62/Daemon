@@ -1,6 +1,12 @@
 """Unified metrics interface for Task Daemon."""
 
-from prometheus_client import Counter, Gauge, Histogram, generate_latest, CollectorRegistry
+from prometheus_client import (
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+    CollectorRegistry,
+)
 from typing import Dict, Any
 
 
@@ -9,16 +15,25 @@ class MetricsCollector:
 
     def __init__(self, registry=None):
         self.registry = registry or CollectorRegistry()
-        self.tasks_received = Counter("tasks_received_total", "Total tasks received", registry=self.registry)
-        self.tasks_processed = Counter(
-            "tasks_processed_total", "Total tasks processed", ["status"], registry=self.registry
+        self.tasks_received = Counter(
+            "tasks_received_total", "Total tasks received", registry=self.registry
         )
-        self.queue_size = Gauge("queue_size", "Current queue size", registry=self.registry)
+        self.tasks_processed = Counter(
+            "tasks_processed_total",
+            "Total tasks processed",
+            ["status"],
+            registry=self.registry,
+        )
+        self.queue_size = Gauge(
+            "queue_size", "Current queue size", registry=self.registry
+        )
         self.processing_time = Histogram(
             "task_processing_seconds", "Task processing time", registry=self.registry
         )
         self.daemon_health = Gauge(
-            "daemon_health", "Daemon health status (1=healthy, 0=unhealthy)", registry=self.registry
+            "daemon_health",
+            "Daemon health status (1=healthy, 0=unhealthy)",
+            registry=self.registry,
         )
 
     def task_received(self):

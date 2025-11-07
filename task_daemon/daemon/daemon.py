@@ -8,7 +8,8 @@ from datetime import datetime
 from typing import Optional
 
 from ..config import DaemonConfig
-from ..core.queue import PersistentQueue
+from ..core.persistent_queue import PersistentQueue
+from ..core.queue import Queue
 from ..core.metrics import MetricsCollector
 from ..core.decorators import get_task_handler
 
@@ -16,9 +17,14 @@ from ..core.decorators import get_task_handler
 class TaskDaemon:
     """Configurable task processing daemon with Flask API."""
 
-    def __init__(self, config: Optional[DaemonConfig] = None, metrics_registry=None):
+    def __init__(
+        self,
+        config: Optional[DaemonConfig] = None,
+        metrics_registry=None,
+        queue: Optional[Queue] = None,
+    ):
         self.config = config or DaemonConfig()
-        self.queue = PersistentQueue(self.config.db_path)
+        self.queue = queue or PersistentQueue(self.config.db_path)
         self.metrics = MetricsCollector(metrics_registry)
         self.app = Flask(__name__)
         self._setup_logging()

@@ -110,6 +110,58 @@ daemon = TaskDaemon(config)
 daemon.run()
 ```
 
+## Queue Types
+
+TaskDaemon supports multiple queue implementations through a pluggable interface:
+
+### PersistentQueue (Default)
+**SQLite-based persistent storage**
+
+```python
+from task_daemon import TaskDaemon, DaemonConfig
+
+# Default - uses PersistentQueue automatically
+daemon = TaskDaemon(config)
+```
+
+**When to use:**
+- ✅ Production deployments
+- ✅ Task durability required (survives restarts)
+- ✅ Task history and auditing needed
+- ✅ Multiple daemon instances (shared database)
+
+### MemoryQueue
+**In-memory storage for speed**
+
+```python
+from task_daemon import TaskDaemon, DaemonConfig, MemoryQueue
+
+daemon = TaskDaemon(config, queue=MemoryQueue())
+```
+
+**When to use:**
+- ✅ Development and testing
+- ✅ High-performance scenarios (no disk I/O)
+- ✅ Temporary/ephemeral workloads
+- ❌ Tasks lost on restart
+- ❌ Single daemon instance only
+
+### Custom Queue Implementation
+
+```python
+from task_daemon import QueueInterface
+
+class MyCustomQueue(QueueInterface):
+    def enqueue(self, task_type: str, task_data: Any) -> int:
+        # Your implementation
+        pass
+    # ... implement all abstract methods
+
+daemon = TaskDaemon(config, queue=MyCustomQueue())
+```
+
+**Examples:** Redis, RabbitMQ, AWS SQS, or database-specific implementations.
+
 ## Docker Deployment
 
 ### Simple Docker Run
