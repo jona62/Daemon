@@ -1,11 +1,14 @@
 """Main TaskDaemon implementation."""
 
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import PlainTextResponse
 import threading
 import time
 import logging
+import uvicorn
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any, List
+from pydantic import BaseModel
 
 from ..config import DaemonConfig
 from ..core.persistent_queue import PersistentQueue
@@ -14,8 +17,30 @@ from ..core.metrics import MetricsCollector
 from ..core.decorators import get_task_handler
 
 
+class TaskRequest(BaseModel):
+    """Request model for queuing tasks."""
+
+    type: str
+    data: Optional[Dict[str, Any]] = None
+
+
+class TaskResponse(BaseModel):
+    """Response model for queued tasks."""
+
+    task_id: int
+
+
+class HealthResponse(BaseModel):
+    """Health check response model."""
+
+    status: str
+    queue_size: int
+    timestamp: str
+    workers: int
+
+
 class TaskDaemon:
-    """Configurable task processing daemon with Flask API."""
+    """Configurable task processing daemon with FastAPI."""
 
     def __init__(
         self,
@@ -26,7 +51,7 @@ class TaskDaemon:
         self.config = config or DaemonConfig()
         self.queue = queue or PersistentQueue(self.config.db_path)
         self.metrics = MetricsCollector(metrics_registry)
-        self.app = Flask(__name__)
+        self.app = FastAPI(title="TaskDaemon", version="0.1.0")
         self._setup_logging()
         self._setup_routes()
         self._workers = []
@@ -41,79 +66,84 @@ class TaskDaemon:
         self.logger = logging.getLogger(__name__)
 
     def _setup_routes(self):
-        """Setup Flask routes."""
+        """Setup FastAPI routes."""
 
-        @self.app.route("/health", methods=["GET"])
-        def health():
-            return jsonify(
-                {
-                    "status": "healthy",
-                    "queue_size": self.queue.size(),
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "workers": len(self._workers),
-                }
+        @self.app.get("/health", response_model=HealthResponse)
+        async def health():
+            return HealthResponse(
+                status="healthy",
+                queue_size=self.queue.size(),
+                timestamp=datetime.utcnow().isoformat(),
+                workers=len(self._workers),
             )
 
-        @self.app.route("/metrics", methods=["GET"])
-        def metrics():
+        @self.app.get("/metrics", response_class=PlainTextResponse)
+        async def metrics():
             return self.metrics.get_prometheus_metrics()
 
-        @self.app.route("/api/metrics", methods=["GET"])
-        def api_metrics():
-            return jsonify(self.metrics.get_summary())
+        @self.app.get("/api/metrics")
+        async def api_metrics():
+            return self.metrics.get_summary()
 
-        @self.app.route("/queue", methods=["POST"])
-        def enqueue():
+        @self.app.post("/queue", response_model=TaskResponse, status_code=200)
+        async def enqueue(task_request: TaskRequest):
             try:
-                data = request.get_json()
-                task_type = data.get("type", "default")
-                task_id = self.queue.enqueue(task_type, data)
+                # Use the data field directly, or fall back to empty dict
+                task_data = task_request.data or {}
+
+                task_id = self.queue.enqueue(task_request.type, task_data)
                 self.metrics.task_received()
                 self.metrics.update_queue_size(self.queue.size())
-                self.logger.info(f"Task {task_id} queued: {task_type}")
-                return jsonify({"task_id": task_id}), 202
+                self.logger.info(f"Task {task_id} queued: {task_request.type}")
+                return TaskResponse(task_id=task_id)
             except Exception as e:
                 self.logger.error(f"Error enqueueing: {e}")
-                return jsonify({"error": str(e)}), 500
+                raise HTTPException(status_code=500, detail=str(e))
 
-        @self.app.route("/api/tasks", methods=["GET"])
-        def get_tasks():
+        @self.app.get("/api/tasks")
+        async def get_tasks(limit: int = 20) -> List[Dict[str, Any]]:
             try:
-                limit = request.args.get("limit", 20, type=int)
-                tasks = self.queue.get_recent_tasks(limit)
-                return jsonify(tasks)
+                return self.queue.get_recent_tasks(limit)
             except Exception as e:
-                return jsonify({"error": str(e)}), 500
+                raise HTTPException(status_code=500, detail=str(e))
 
-        @self.app.route("/api/tasks/<int:task_id>", methods=["GET"])
-        def get_task(task_id):
+        @self.app.get("/api/tasks/{task_id}")
+        async def get_task(task_id: int):
             try:
                 task = self.queue.get_task(task_id)
                 if task:
-                    return jsonify(task)
-                return jsonify({"error": "Task not found"}), 404
+                    return task
+                raise HTTPException(status_code=404, detail="Task not found")
+            except HTTPException:
+                raise
             except Exception as e:
-                return jsonify({"error": str(e)}), 500
+                raise HTTPException(status_code=500, detail=str(e))
 
-        @self.app.route("/api/tasks/<int:task_id>", methods=["DELETE"])
-        def delete_task(task_id):
+        @self.app.delete("/api/tasks/{task_id}")
+        async def delete_task(task_id: int):
             try:
                 if self.queue.delete_task(task_id):
                     self.metrics.update_queue_size(self.queue.size())
-                    return jsonify({"message": "Task deleted"}), 200
-                return jsonify({"error": "Task not found"}), 404
+                    return {"message": "Task deleted"}
+                raise HTTPException(status_code=404, detail="Task not found")
+            except HTTPException:
+                raise
             except Exception as e:
-                return jsonify({"error": str(e)}), 500
+                raise HTTPException(status_code=500, detail=str(e))
 
-        @self.app.route("/api/tasks/<int:task_id>/redrive", methods=["POST"])
-        def redrive_task(task_id):
+        @self.app.post("/api/tasks/{task_id}/redrive")
+        async def redrive_task(task_id: int):
             try:
                 if self.queue.redrive_task(task_id):
                     self.metrics.update_queue_size(self.queue.size())
-                    return jsonify({"message": "Task redriven"}), 200
-                return jsonify({"error": "Task not found or not failed"}), 404
+                    return {"message": "Task redriven"}
+                raise HTTPException(
+                    status_code=404, detail="Task not found or not failed"
+                )
+            except HTTPException:
+                raise
             except Exception as e:
-                return jsonify({"error": str(e)}), 500
+                raise HTTPException(status_code=500, detail=str(e))
 
     def _worker(self):
         """Worker thread function."""
@@ -172,10 +202,15 @@ class TaskDaemon:
         self.start_workers()
         self.metrics.set_health(True)
 
-        flask_kwargs = {"host": self.config.host, "port": self.config.port, **kwargs}
+        uvicorn_kwargs = {
+            "host": self.config.host,
+            "port": self.config.port,
+            "log_level": self.config.log_level.lower(),
+            **kwargs,
+        }
 
         try:
-            self.app.run(**flask_kwargs)
+            uvicorn.run(self.app, **uvicorn_kwargs)
         finally:
             self.stop_workers()
             self.metrics.set_health(False)

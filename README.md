@@ -1,6 +1,6 @@
 # TaskDaemon
 
-A configurable task processing system with monitoring, designed for easy integration and deployment.
+A configurable task processing system with monitoring, built with FastAPI and designed for easy integration and deployment.
 
 ## Features
 
@@ -10,6 +10,8 @@ A configurable task processing system with monitoring, designed for easy integra
 - 🐳 **Docker Ready**: Complete Docker and Docker Compose support
 - 🔄 **Persistent Queue**: SQLite-based task queue with retry logic
 - 🧵 **Multi-threaded**: Configurable worker threads
+- ⚡ **FastAPI**: High-performance async API with automatic OpenAPI docs
+- 🔍 **Pydantic**: Type-safe request/response models
 
 ## Quick Start
 
@@ -215,6 +217,8 @@ Access:
 - `GET /api/tasks/{id}` - Get specific task with metadata
 - `DELETE /api/tasks/{id}` - Delete task from queue
 - `POST /api/tasks/{id}/redrive` - Redrive failed task
+- `GET /docs` - Interactive API documentation (Swagger UI)
+- `GET /redoc` - Alternative API documentation
 
 ## CLI Usage
 

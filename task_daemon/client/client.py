@@ -27,18 +27,16 @@ class DaemonClient:
             Task ID if successful, None if failed (unless critical=True)
         """
         try:
-            payload = (
-                {"type": task_type, **task_data}
-                if isinstance(task_data, dict)
-                else {"type": task_type, "data": task_data}
-            )
+            payload = {"type": task_type, "data": task_data}
             response = requests.post(
                 f"{self.daemon_url}/queue", json=payload, timeout=self.timeout
             )
-            if response.status_code == 202:
+            if response.status_code == 200:
                 return response.json().get("task_id")
             else:
                 self.logger.warning(f"Failed to queue task: {response.status_code}")
+                if response.status_code == 422:
+                    self.logger.warning(f"Validation error: {response.text}")
 
         except Exception as e:
             self.logger.warning(f"Failed to queue task: {e}")
