@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  task-daemon:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - daemon_data:/data
+    environment:
+      - DAEMON_WORKERS=4
+      - DAEMON_LOG_LEVEL=INFO
+      - DAEMON_DB_PATH=/data/queue.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    depends_on:
+      - task-daemon
+
+volumes:
+  daemon_data:
+  prometheus_data:
