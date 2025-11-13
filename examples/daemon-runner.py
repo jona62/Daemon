@@ -3,21 +3,24 @@
 
 import time
 from task_daemon import TaskDaemon, DaemonConfig, task_handler
+from examples.inputs import LogAnalytics, SendEmailInput
 
 
 # Define task handlers using decorators
 @task_handler
-def send_email(task_data):
+def send_email(task_data: SendEmailInput):
     """Handle email sending tasks."""
-    print(f"Sending email to {task_data.get('recipient', 'unknown')}")
+    print(f"Sending email to {task_data.recipient}")
     time.sleep(1)  # Simulate work
+    print("Email sent")
 
 
 @task_handler
-def log_analytics(task_data):
+def log_analytics(task_data: LogAnalytics):
     """Handle analytics logging tasks."""
-    print(f"Logging analytics: {task_data.get('event', 'unknown')}")
+    print(f"Logging analytics: {task_data.event}")
     time.sleep(1)  # Simulate work
+    print("Logging Analytics done")
 
 
 if __name__ == "__main__":

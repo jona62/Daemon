@@ -64,7 +64,7 @@ def test_daemon_client():
 
     # These will fail since no daemon is running, but test the interface
     health = client.health_check()
-    assert "status" in health or "error" in health
+    assert health.status == "healthy" or health.status == "error"
 
 
 def test_queue_operations(daemon):
@@ -125,11 +125,18 @@ def test_client_new_methods(mock_delete, mock_post, mock_get):
 
     # Test get_task
     mock_get.return_value.status_code = 200
-    mock_get.return_value.json.return_value = {"id": 1, "status": "completed"}
+    mock_get.return_value.json.return_value = {
+        "id": 1,
+        "status": "completed",
+        "task_type": "test",
+        "task_data": "{}",
+        "created_at": "2023-01-01",
+        "attempts": 0,
+    }
 
     task = client.get_task(1)
-    assert task["id"] == 1
-    assert task["status"] == "completed"
+    assert task.id == 1  # Pydantic model attribute access
+    assert task.status == "completed"
     mock_get.assert_called_with("http://localhost:8080/api/tasks/1", timeout=0.1)
 
     # Test get_task not found
@@ -178,7 +185,7 @@ def test_mark_complete_with_result(daemon):
 
 
 def test_database_cleanup_on_init():
-    """Test that database is cleaned on initialization."""
+    """Test that database can be explicitly cleared."""
     from prometheus_client import CollectorRegistry
 
     db_path = "/tmp/test_cleanup.db"
@@ -189,10 +196,13 @@ def test_database_cleanup_on_init():
     task_id = daemon1.queue.enqueue("test", {"data": "test"})
     assert daemon1.queue.get_task(task_id) is not None
 
-    # Create new daemon - should clean database
-    config2 = DaemonConfig(db_path=db_path)
-    daemon2 = TaskDaemon(config2, metrics_registry=CollectorRegistry())
-    assert daemon2.queue.get_task(task_id) is None  # Should be gone
+    # Clear database explicitly
+    daemon1.queue.clear_database()
+    assert daemon1.queue.get_task(task_id) is None  # Should be gone
+
+    # Cleanup
+    if os.path.exists(db_path):
+        os.remove(db_path)
 
 
 def test_memory_queue_implementation():

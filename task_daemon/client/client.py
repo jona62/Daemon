@@ -95,9 +95,10 @@ class DaemonClient:
             tasks = response.json()
             # Parse JSON strings in task_data fields
             for task in tasks:
-                if task.get('task_data') and isinstance(task['task_data'], str):
+                if task.get("task_data") and isinstance(task["task_data"], str):
                     import json
-                    task['task_data'] = json.loads(task['task_data'])
+
+                    task["task_data"] = json.loads(task["task_data"])
             return [TaskInfo.model_validate(task) for task in tasks]
         except Exception as e:
             self.logger.debug(f"Tasks request failed: {e}")
@@ -121,9 +122,10 @@ class DaemonClient:
             if response.status_code == 200:
                 raw_data = response.json()
                 # Parse JSON string in task_data field
-                if raw_data.get('task_data') and isinstance(raw_data['task_data'], str):
+                if raw_data.get("task_data") and isinstance(raw_data["task_data"], str):
                     import json
-                    raw_data['task_data'] = json.loads(raw_data['task_data'])
+
+                    raw_data["task_data"] = json.loads(raw_data["task_data"])
                 return TaskInfo.model_validate(raw_data)
             return None
         except Exception as e:

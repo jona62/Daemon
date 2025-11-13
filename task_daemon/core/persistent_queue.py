@@ -17,11 +17,16 @@ class PersistentQueue(Queue):
         self._lock = threading.Lock()
         self.init_db()
 
-    def init_db(self):
-        """Initialize database schema. Deletes existing database."""
-        # Delete existing database
+    def clear_database(self):
+        """Clear all tasks from the database."""
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
+        self.init_db()
+
+    def init_db(self):
+        """Initialize database schema. Only deletes if explicitly requested."""
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
@@ -54,65 +59,78 @@ class PersistentQueue(Queue):
     def dequeue(self) -> Optional[Tuple[int, str, Any]]:
         """Get next pending task. Returns (id, task_type, task_data) or None."""
         with self._lock:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute(
+            try:
+                with sqlite3.connect(self.db_path) as conn:
+                    cursor = conn.execute(
+                        """
+                        SELECT id, task_type, task_data FROM tasks
+                        WHERE status = 'pending'
+                        ORDER BY id ASC LIMIT 1
                     """
-                    SELECT id, task_type, task_data FROM tasks 
-                    WHERE status = 'pending' 
-                    ORDER BY id ASC LIMIT 1
-                """
-                )
-                row = cursor.fetchone()
-                if row:
-                    task_id, task_type, task_data = row
-                    conn.execute(
-                        "UPDATE tasks SET status = ? WHERE id = ?",
-                        ("processing", task_id),
                     )
-                    conn.commit()
-                    return task_id, task_type, json.loads(task_data)
+                    row = cursor.fetchone()
+                    if row:
+                        task_id, task_type, task_data = row
+                        conn.execute(
+                            "UPDATE tasks SET status = ? WHERE id = ?",
+                            ("processing", task_id),
+                        )
+                        conn.commit()
+                        return task_id, task_type, json.loads(task_data)
+                    return None
+            except sqlite3.Error as e:
+                # Re-initialize database if it's corrupted or missing
+                self.init_db()
                 return None
 
     def mark_complete(self, task_id: int, result: Any = None):
         """Mark task as completed (terminal state)."""
         with self._lock:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute(
-                    """
-                    UPDATE tasks SET status = ?, completed_at = CURRENT_TIMESTAMP, result = ? 
-                    WHERE id = ?
-                    """,
-                    ("completed", json.dumps(result) if result else None, task_id),
-                )
-                conn.commit()
+            try:
+                with sqlite3.connect(self.db_path) as conn:
+                    conn.execute(
+                        """
+                        UPDATE tasks SET status = ?, completed_at = CURRENT_TIMESTAMP, result = ?
+                        WHERE id = ?
+                        """,
+                        ("completed", json.dumps(result) if result else None, task_id),
+                    )
+                    conn.commit()
+            except sqlite3.Error:
+                # Re-initialize database if it's corrupted or missing
+                self.init_db()
 
     def mark_failed(self, task_id: int, error: str, max_retries: int = 3):
         """Mark task as failed, retry if under max attempts."""
         with self._lock:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute(
-                    "SELECT attempts FROM tasks WHERE id = ?", (task_id,)
-                )
-                result = cursor.fetchone()
-                if not result:
-                    return
+            try:
+                with sqlite3.connect(self.db_path) as conn:
+                    cursor = conn.execute(
+                        "SELECT attempts FROM tasks WHERE id = ?", (task_id,)
+                    )
+                    result = cursor.fetchone()
+                    if not result:
+                        return
 
-                attempts = result[0]
-                if attempts >= max_retries:
-                    conn.execute(
-                        """
-                        UPDATE tasks SET status = ?, last_error = ? WHERE id = ?
-                    """,
-                        ("failed", error, task_id),
-                    )
-                else:
-                    conn.execute(
-                        """
-                        UPDATE tasks SET status = ?, attempts = ?, last_error = ? WHERE id = ?
-                    """,
-                        ("pending", attempts + 1, error, task_id),
-                    )
-                conn.commit()
+                    attempts = result[0]
+                    if attempts >= max_retries:
+                        conn.execute(
+                            """
+                            UPDATE tasks SET status = ?, last_error = ? WHERE id = ?
+                        """,
+                            ("failed", error, task_id),
+                        )
+                    else:
+                        conn.execute(
+                            """
+                            UPDATE tasks SET status = ?, attempts = ?, last_error = ? WHERE id = ?
+                        """,
+                            ("pending", attempts + 1, error, task_id),
+                        )
+                    conn.commit()
+            except sqlite3.Error:
+                # Re-initialize database if it's corrupted or missing
+                self.init_db()
 
     def size(self) -> int:
         """Get number of pending tasks."""
