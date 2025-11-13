@@ -68,12 +68,15 @@ class TaskDaemon:
     def _invoke_handler(self, handler, task_data):
         """Invoke handler with proper type conversion."""
         import inspect
+
         sig = inspect.signature(handler)
         params = list(sig.parameters.values())
 
         if params and task_data is not None:
             expected_type = params[0].annotation
-            if expected_type != inspect.Parameter.empty and hasattr(expected_type, 'model_validate'):
+            if expected_type != inspect.Parameter.empty and hasattr(
+                expected_type, "model_validate"
+            ):
                 task_input = expected_type.model_validate(task_data)
                 return handler(task_input)
             else:
@@ -193,7 +196,8 @@ class TaskDaemon:
 
                     self.metrics.update_queue_size(self.queue.size())
                 else:
-                    time.sleep(self.config.worker_sleep)
+                    if self.config.worker_sleep > 0.0:
+                        time.sleep(self.config.worker_sleep)
 
             except Exception as e:
                 self.logger.error(f"Worker error: {e}")

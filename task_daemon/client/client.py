@@ -2,8 +2,10 @@
 
 import requests
 import logging
-from typing import Dict, Any, Optional
+from typing import Optional, List
 from pydantic import BaseModel
+
+from .models import HealthStatus, TaskInfo, MetricsSummary
 
 
 class DaemonClient:
@@ -15,7 +17,10 @@ class DaemonClient:
         self.logger = logging.getLogger(__name__)
 
     def queue_task(
-        self, task_type: str, task_data: Optional[BaseModel] = None, critical: bool = True
+        self,
+        task_type: str,
+        task_data: Optional[BaseModel] = None,
+        critical: bool = True,
     ) -> Optional[int]:
         """Queue a task for processing.
 
@@ -29,7 +34,11 @@ class DaemonClient:
         """
         try:
             # Auto-serialize Pydantic models
-            data = task_data.model_dump() if isinstance(task_data, BaseModel) else task_data
+            data = (
+                task_data.model_dump()
+                if isinstance(task_data, BaseModel)
+                else task_data
+            )
             payload = {"type": task_type, "data": data}
             response = requests.post(
                 f"{self.daemon_url}/queue", json=payload, timeout=self.timeout
@@ -47,27 +56,35 @@ class DaemonClient:
                 raise
         return None
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> HealthStatus:
         """Check daemon health status."""
         try:
             response = requests.get(f"{self.daemon_url}/health", timeout=self.timeout)
-            return response.json()
+            return HealthStatus.model_validate(response.json())
         except Exception as e:
             self.logger.debug(f"Health check failed: {e}")
-            return {"status": "unhealthy", "error": str(e)}
+            return HealthStatus(
+                status="unhealthy", queue_size=0, timestamp="", workers=0
+            )
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> MetricsSummary:
         """Get daemon metrics."""
         try:
             response = requests.get(
                 f"{self.daemon_url}/api/metrics", timeout=self.timeout
             )
-            return response.json()
+            return MetricsSummary.model_validate(response.json())
         except Exception as e:
             self.logger.debug(f"Metrics request failed: {e}")
-            return {}
+            return MetricsSummary(
+                tasks_received=0,
+                tasks_processed=0,
+                tasks_failed=0,
+                queue_size=0,
+                workers=0,
+            )
 
-    def get_tasks(self, limit: int = 20) -> list:
+    def get_tasks(self, limit: int = 20) -> List[TaskInfo]:
         """Get recent tasks."""
         try:
             response = requests.get(
@@ -75,7 +92,13 @@ class DaemonClient:
                 params={"limit": limit},
                 timeout=self.timeout,
             )
-            return response.json()
+            tasks = response.json()
+            # Parse JSON strings in task_data fields
+            for task in tasks:
+                if task.get('task_data') and isinstance(task['task_data'], str):
+                    import json
+                    task['task_data'] = json.loads(task['task_data'])
+            return [TaskInfo.model_validate(task) for task in tasks]
         except Exception as e:
             self.logger.debug(f"Tasks request failed: {e}")
             return []
@@ -89,14 +112,19 @@ class DaemonClient:
             self.logger.debug(f"Prometheus metrics request failed: {e}")
             return ""
 
-    def get_task(self, task_id: int) -> Optional[Dict[str, Any]]:
+    def get_task(self, task_id: int) -> Optional[TaskInfo]:
         """Get task by ID with all metadata."""
         try:
             response = requests.get(
                 f"{self.daemon_url}/api/tasks/{task_id}", timeout=self.timeout
             )
             if response.status_code == 200:
-                return response.json()
+                raw_data = response.json()
+                # Parse JSON string in task_data field
+                if raw_data.get('task_data') and isinstance(raw_data['task_data'], str):
+                    import json
+                    raw_data['task_data'] = json.loads(raw_data['task_data'])
+                return TaskInfo.model_validate(raw_data)
             return None
         except Exception as e:
             self.logger.debug(f"Get task request failed: {e}")

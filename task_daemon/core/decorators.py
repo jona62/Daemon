@@ -8,7 +8,9 @@ from pydantic import BaseModel
 _task_handlers: Dict[str, Callable[[BaseModel], BaseModel]] = {}
 
 
-def task_handler(func: Callable[[BaseModel], BaseModel]) -> Callable[[BaseModel], BaseModel]:
+def task_handler(
+    func: Callable[[BaseModel], BaseModel],
+) -> Callable[[BaseModel], BaseModel]:
     """
     Decorator to register a task handler using function name as task type.
 
