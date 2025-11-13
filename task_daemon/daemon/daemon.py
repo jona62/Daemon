@@ -65,6 +65,22 @@ class TaskDaemon:
         )
         self.logger = logging.getLogger(__name__)
 
+    def _invoke_handler(self, handler, task_data):
+        """Invoke handler with proper type conversion."""
+        import inspect
+        sig = inspect.signature(handler)
+        params = list(sig.parameters.values())
+
+        if params and task_data is not None:
+            expected_type = params[0].annotation
+            if expected_type != inspect.Parameter.empty and hasattr(expected_type, 'model_validate'):
+                task_input = expected_type.model_validate(task_data)
+                return handler(task_input)
+            else:
+                return handler(task_data)
+        else:
+            return handler() if task_data is None else handler(task_data)
+
     def _setup_routes(self):
         """Setup FastAPI routes."""
 
@@ -158,7 +174,7 @@ class TaskDaemon:
                     try:
                         handler = get_task_handler(task_type)
                         if handler:
-                            result = handler(task_data)
+                            result = self._invoke_handler(handler, task_data)
                             self.queue.mark_complete(task_id, result)
                             self.logger.info(f"Task {task_id} completed: {result}")
                         else:

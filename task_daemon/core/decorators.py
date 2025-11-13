@@ -1,13 +1,14 @@
 """Task handler decorators."""
 
-from typing import Dict, Callable, Any
+from typing import Dict, Callable
 from functools import wraps
+from pydantic import BaseModel
 
 # Registry for task handlers
-_task_handlers: Dict[str, Callable] = {}
+_task_handlers: Dict[str, Callable[[BaseModel], BaseModel]] = {}
 
 
-def task_handler(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
+def task_handler(func: Callable[[BaseModel], BaseModel]) -> Callable[[BaseModel], BaseModel]:
     """
     Decorator to register a task handler using function name as task type.
 
@@ -15,7 +16,7 @@ def task_handler(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
     """
 
     @wraps(func)
-    def wrapper(event: Any) -> Any:
+    def wrapper(event: BaseModel) -> BaseModel:
         return func(event)
 
     task_type = func.__name__
@@ -23,12 +24,12 @@ def task_handler(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
     return wrapper
 
 
-def get_task_handler(task_type: str) -> Callable:
+def get_task_handler(task_type: str) -> Callable[[BaseModel], BaseModel]:
     """Get registered task handler by type."""
     return _task_handlers.get(task_type)
 
 
-def get_all_handlers() -> Dict[str, Callable]:
+def get_all_handlers() -> Dict[str, Callable[[BaseModel], BaseModel]]:
     """Get all registered task handlers."""
     return _task_handlers.copy()
 

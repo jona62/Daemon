@@ -3,6 +3,7 @@
 import requests
 import logging
 from typing import Dict, Any, Optional
+from pydantic import BaseModel
 
 
 class DaemonClient:
@@ -14,7 +15,7 @@ class DaemonClient:
         self.logger = logging.getLogger(__name__)
 
     def queue_task(
-        self, task_type: str, task_data: Any, critical: bool = True
+        self, task_type: str, task_data: Optional[BaseModel] = None, critical: bool = True
     ) -> Optional[int]:
         """Queue a task for processing.
 
@@ -27,7 +28,9 @@ class DaemonClient:
             Task ID if successful, None if failed (unless critical=True)
         """
         try:
-            payload = {"type": task_type, "data": task_data}
+            # Auto-serialize Pydantic models
+            data = task_data.model_dump() if isinstance(task_data, BaseModel) else task_data
+            payload = {"type": task_type, "data": data}
             response = requests.post(
                 f"{self.daemon_url}/queue", json=payload, timeout=self.timeout
             )
