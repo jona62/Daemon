@@ -229,3 +229,70 @@ def test_memory_queue_implementation():
     task_details = daemon.queue.get_task(task_id)
     assert task_details["status"] == "completed"
     assert task_details["result"]["result"] == "success"
+
+
+def test_pydantic_output_serialization():
+    """Test that Pydantic model outputs are properly serialized."""
+    from prometheus_client import CollectorRegistry
+    from pydantic import BaseModel
+
+    class TestInput(BaseModel):
+        message: str
+
+    class TestOutput(BaseModel):
+        status: str
+        processed_message: str
+
+    # Clear handlers and register new one
+    clear_handlers()
+
+    @task_handler
+    def test_pydantic_handler(data: TestInput) -> TestOutput:
+        return TestOutput(
+            status="success", processed_message=f"Processed: {data.message}"
+        )
+
+    config = DaemonConfig(port=8095, db_path="/tmp/test_pydantic_output.db")
+    daemon = TaskDaemon(config, metrics_registry=CollectorRegistry())
+
+    # Clear database
+    daemon.queue.clear_database()
+
+    # Start workers
+    daemon.start_workers()
+
+    try:
+        # Queue task
+        task_id = daemon.queue.enqueue(
+            "test_pydantic_handler", {"message": "Hello World"}
+        )
+
+        # Wait for processing
+        import time
+
+        time.sleep(2)
+
+        # Check result
+        task = daemon.queue.get_task(task_id)
+        assert task is not None
+        assert task["status"] == "completed"
+
+        # Result should be serialized as JSON string
+        result = task["result"]
+        assert result is not None
+        assert isinstance(result, str)  # Stored as JSON string
+
+        # Parse the JSON to verify structure
+        import json
+
+        parsed_result = json.loads(result)
+        assert parsed_result["status"] == "success"
+        assert parsed_result["processed_message"] == "Processed: Hello World"
+
+    finally:
+        daemon.stop_workers()
+        # Cleanup
+        import os
+
+        if os.path.exists("/tmp/test_pydantic_output.db"):
+            os.remove("/tmp/test_pydantic_output.db")

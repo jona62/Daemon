@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """Basic usage example for TaskDaemon."""
 
+from datetime import datetime
 import time
 from task_daemon import TaskDaemon, DaemonConfig, task_handler
-from examples.inputs import LogAnalytics, SendEmailInput
+from examples.inputs import LogAnalytics, SendEmailInput, SendEmailOutput
 
 
 # Define task handlers using decorators
 @task_handler
-def send_email(task_data: SendEmailInput):
+def send_email(task_data: SendEmailInput) -> SendEmailOutput:
     """Handle email sending tasks."""
     print(f"Sending email to {task_data.recipient}")
     time.sleep(1)  # Simulate work
     print("Email sent")
+    return SendEmailOutput(sent_at=datetime.now())
 
 
 @task_handler

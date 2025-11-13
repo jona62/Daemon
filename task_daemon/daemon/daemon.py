@@ -66,23 +66,32 @@ class TaskDaemon:
         self.logger = logging.getLogger(__name__)
 
     def _invoke_handler(self, handler, task_data):
-        """Invoke handler with proper type conversion."""
+        """Invoke handler with proper type conversion for input and output."""
         import inspect
+        from pydantic import BaseModel
 
         sig = inspect.signature(handler)
         params = list(sig.parameters.values())
 
+        # Handle input conversion
         if params and task_data is not None:
             expected_type = params[0].annotation
             if expected_type != inspect.Parameter.empty and hasattr(
                 expected_type, "model_validate"
             ):
                 task_input = expected_type.model_validate(task_data)
-                return handler(task_input)
+                result = handler(task_input)
             else:
-                return handler(task_data)
+                result = handler(task_data)
         else:
-            return handler() if task_data is None else handler(task_data)
+            result = handler() if task_data is None else handler(task_data)
+
+        # Handle output serialization
+        if isinstance(result, BaseModel):
+            serialized = result.model_dump()
+            self.logger.debug(f"Serialized Pydantic result: {serialized}")
+            return serialized
+        return result
 
     def _setup_routes(self):
         """Setup FastAPI routes."""

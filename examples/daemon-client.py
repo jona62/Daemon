@@ -19,7 +19,7 @@ client = DaemonClient(daemon_url="http://localhost:8080")
 if __name__ == "__main__":
     # Queue a task
     task_id = client.queue_task(
-        "send_email", SendEmailInput(recipient="test@example.com")
+        task_type="send_email", task_data=SendEmailInput(recipient="test@example.com")
     )
     logger.info(f"Queued task {task_id}")
 
