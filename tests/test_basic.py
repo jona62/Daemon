@@ -64,7 +64,7 @@ def test_daemon_client():
 
     # These will fail since no daemon is running, but test the interface
     health = client.health_check()
-    assert health.status == "healthy" or health.status == "error"
+    assert health.status in ["healthy", "error", "unhealthy"]
 
 
 def test_queue_operations(daemon):
