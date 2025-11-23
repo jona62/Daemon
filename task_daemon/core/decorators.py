@@ -36,6 +36,12 @@ def get_all_handlers() -> Dict[str, Callable[[BaseModel], BaseModel]]:
     return _task_handlers.copy()
 
 
+def register_handler(func: Callable) -> None:
+    """Register a handler function using its name as task type."""
+    task_type = func.__name__
+    _task_handlers[task_type] = func
+
+
 def clear_handlers():
     """Clear all registered handlers (for testing)."""
     _task_handlers.clear()

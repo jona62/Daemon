@@ -6,7 +6,7 @@ A configurable task processing system with monitoring, built with FastAPI and de
 
 - 🔧 **Configurable**: Sensible defaults with environment variable overrides
 - 📊 **Monitoring**: Built-in Prometheus metrics and health checks
-- 🎯 **Easy Integration**: Decorator-based task handlers
+- 🎯 **Easy Integration**: Multiple registration patterns (decorators, direct, builder)
 - 🐳 **Docker Ready**: Complete Docker and Docker Compose support
 - 🔄 **Persistent Queue**: SQLite-based task queue with retry logic
 - 🧵 **Multi-threaded**: Configurable worker threads
@@ -24,37 +24,108 @@ pip install task-daemon
 ### Basic Usage
 
 ```python
-from task_daemon import TaskDaemon, task_handler
+from task_daemon import TaskDaemon, DaemonBuilder, DaemonConfig
 
 # Define task handlers - function name becomes task type
-@task_handler
 def send_email(event):
     print(f"Sending email to {event.get('recipient')}")
     return {"status": "sent", "recipient": event.get('recipient')}
 
-@task_handler
 def process_data(event):
     print(f"Processing: {event.get('data')}")
     return {"status": "processed", "items": len(event.get('data', {}))}
 
-# Run daemon
-daemon = TaskDaemon()
+# Option 1: Direct Registration
+daemon = TaskDaemon(DaemonConfig())
+daemon.register_handler(send_email)
+daemon.register_handler(process_data)
 daemon.run()  # Starts on localhost:8080
+
+# Option 2: Builder Pattern
+daemon = (DaemonBuilder()
+          .with_config(worker_threads=4, port=8080)
+          .add_handler(send_email)
+          .add_handler(process_data)
+          .build())
+daemon.run()
+
+# Option 3: Decorator Pattern
+from task_daemon import task_handler
+
+@task_handler
+def decorator_handler(event):
+    return {"status": "processed"}
+
+daemon = TaskDaemon()
+daemon.run()
 ```
 
-**⚠️ Important**: You must register task handlers using `@task_handler` decorators before starting the daemon. Running `task-daemon` without handlers will start the service but tasks will remain unprocessed in the queue.
+### Pydantic Integration
+
+TaskDaemon provides full Pydantic support for type-safe task handlers with automatic validation and serialization:
+
+```python
+from task_daemon import TaskDaemon, task_handler
+from pydantic import BaseModel, EmailStr
+from typing import List
+
+class EmailInput(BaseModel):
+    recipient: EmailStr
+    subject: str
+    body: str
+
+class EmailOutput(BaseModel):
+    status: str
+    message_id: str
+    timestamp: str
+
+@task_handler
+def send_email(task_data: EmailInput) -> EmailOutput:
+    """Type-safe email handler with automatic validation."""
+    print(f"Sending email to {task_data.recipient}")
+    # task_data is automatically validated against EmailInput model
+  
+    return EmailOutput(
+        status="sent",
+        message_id="msg-12345",
+        timestamp="2023-01-01T12:00:00Z"
+    )
+    # Output automatically serialized and stored
+
+# Run daemon
+daemon = TaskDaemon()
+daemon.run()
+```
+
+**Benefits:**
+
+- ✅ **Automatic Validation**: Input data validated against Pydantic models
+- ✅ **Type Safety**: Full IDE support with autocomplete and error detection
+- ✅ **Structured Outputs**: Complex results properly serialized/deserialized
+- ✅ **Error Handling**: Clear validation errors for malformed data
+- ✅ **Backward Compatible**: Works alongside non-Pydantic handlers
+
+**⚠️ Important**: Register task handlers using direct registration (`daemon.register_handler(func)`), builder pattern (`.add_handler(func)`), or `@task_handler` decorators before starting the daemon. Running without handlers will start the service but tasks will remain unprocessed in the queue.
 
 ### Examples
 
-Run the included examples:
+Run the consolidated examples:
 
 ```bash
-# Start daemon with example handlers
-python examples/daemon-runner.py
+# Start daemon with all example handlers
+python examples/daemon.py
 
-# In another terminal, queue tasks
-python examples/daemon-client.py
+# In another terminal, test all scenarios
+python examples/client.py
 ```
+
+**Available daemon variants:**
+
+- `daemon.py` - Direct registration (port 8080)
+- `daemon_builder.py` - Builder pattern (port 8081)
+- `custom-queue.py` - MemoryQueue (port 8082)
+
+See [examples/README.md](examples/README.md) for detailed feature testing guide.
 
 ### Client Usage
 
@@ -117,6 +188,7 @@ daemon.run()
 TaskDaemon supports multiple queue implementations through a pluggable interface:
 
 ### PersistentQueue (Default)
+
 **SQLite-based persistent storage**
 
 ```python
@@ -127,12 +199,14 @@ daemon = TaskDaemon(config)
 ```
 
 **When to use:**
+
 - ✅ Production deployments
 - ✅ Task durability required (survives restarts)
 - ✅ Task history and auditing needed
 - ✅ Multiple daemon instances (shared database)
 
 ### MemoryQueue
+
 **In-memory storage for speed**
 
 ```python
@@ -142,6 +216,7 @@ daemon = TaskDaemon(config, queue=MemoryQueue())
 ```
 
 **When to use:**
+
 - ✅ Development and testing
 - ✅ High-performance scenarios (no disk I/O)
 - ✅ Temporary/ephemeral workloads

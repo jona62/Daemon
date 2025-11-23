@@ -14,7 +14,7 @@ from ..config import DaemonConfig
 from ..core.persistent_queue import PersistentQueue
 from ..core.queue import Queue
 from ..core.metrics import MetricsCollector
-from ..core.decorators import get_task_handler
+from ..core.decorators import get_task_handler, register_handler
 
 
 class TaskRequest(BaseModel):
@@ -225,6 +225,13 @@ class TaskDaemon:
         """Stop worker threads."""
         self._running = False
         self.logger.info("Stopping workers")
+
+    def register_handler(self, handler_func):
+        """Register a task handler using function name as task type."""
+        register_handler(handler_func)
+        task_type = handler_func.__name__
+        self.logger.info(f"Registered handler: {task_type}")
+        return self
 
     def run(self, **kwargs):
         """Run the daemon server."""

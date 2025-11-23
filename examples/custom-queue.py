@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-"""Example showing how to use different queue implementations."""
+"""Daemon using MemoryQueue with direct registration."""
 
-from task_daemon import TaskDaemon, DaemonConfig, task_handler, MemoryQueue
-
-
-@task_handler
-def process_data(task_data):
-    """Handle data processing tasks."""
-    print(f"Processing: {task_data.get('data', 'unknown')}")
-    return {"status": "processed", "items": len(task_data.get("data", []))}
+from task_daemon import TaskDaemon, DaemonConfig, MemoryQueue
+from examples.tasks import get_all_handlers
 
 
 if __name__ == "__main__":
-    # Use in-memory queue instead of persistent SQLite queue
-    config = DaemonConfig(port=8080, log_level="INFO")
-    memory_queue = MemoryQueue()
+    config = DaemonConfig(worker_threads=2, port=8081, log_level="INFO")
+    daemon = TaskDaemon(config, queue=MemoryQueue())
 
-    daemon = TaskDaemon(config, queue=memory_queue)
-    print("Starting TaskDaemon with in-memory queue on port 8080...")
+    # Direct registration
+    for handler in get_all_handlers():
+        daemon.register_handler(handler)
+
+    print("🚀 Starting TaskDaemon with MemoryQueue...")
+    print("⚠️  Tasks will be lost on restart (in-memory only)")
+    print("🌐 Running on: http://localhost:8081")
     daemon.run()
