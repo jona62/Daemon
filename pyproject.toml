@@ -28,8 +28,8 @@ dev = [
 task-daemon = "task_daemon.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/task-daemon"
-Repository = "https://github.com/yourusername/task-daemon"
+Homepage = "https://github.com/jona62/task-daemon"
+Repository = "https://github.com/jona62/task-daemon"
 
 [build-system]
 requires = ["hatchling"]
