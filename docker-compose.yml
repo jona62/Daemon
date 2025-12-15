@@ -4,15 +4,16 @@ services:
   task-daemon:
     build: .
     ports:
-      - "8080:8080"
+      - "${DAEMON_PORT:-8080}:${DAEMON_PORT:-8080}"
     volumes:
       - daemon_data:/data
     environment:
-      - DAEMON_WORKERS=4
-      - DAEMON_LOG_LEVEL=INFO
+      - DAEMON_WORKERS=${DAEMON_WORKERS:-4}
+      - DAEMON_LOG_LEVEL=${DAEMON_LOG_LEVEL:-INFO}
       - DAEMON_DB_PATH=/data/queue.db
+      - DAEMON_PORT=${DAEMON_PORT:-8080}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${DAEMON_PORT:-8080}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -30,6 +31,8 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
+    environment:
+      - DAEMON_PORT=${DAEMON_PORT:-8080}
     depends_on:
       - task-daemon
 

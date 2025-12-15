@@ -67,6 +67,7 @@ daemon.run()
 ```
 
 **Benefits:**
+
 - ✅ Automatic input validation
 - ✅ Type safety with IDE support
 - ✅ Structured output serialization
@@ -179,8 +180,26 @@ docker-compose up
 ```
 
 Access:
+
 - TaskDaemon: http://localhost:8080
 - Prometheus: http://localhost:9090
+
+**Custom Port:**
+
+```bash
+# export variables
+export DAEMON_PORT=8081
+export DAEMON_WORKERS=8
+docker-compose up
+```
+
+Or create a `.env` file:
+
+```
+DAEMON_PORT=8081
+DAEMON_WORKERS=8
+DAEMON_LOG_LEVEL=DEBUG
+```
 
 ## Examples
 
