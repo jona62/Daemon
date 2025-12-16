@@ -73,18 +73,33 @@ class TaskDaemon:
         sig = inspect.signature(handler)
         params = list(sig.parameters.values())
 
-        # Handle input conversion
-        if params and task_data is not None:
-            expected_type = params[0].annotation
-            if expected_type != inspect.Parameter.empty and hasattr(
-                expected_type, "model_validate"
-            ):
-                task_input = expected_type.model_validate(task_data)
-                result = handler(task_input)
+        # No parameters - call with no args
+        if not params:
+            result = handler()
+        # Single parameter - existing behavior
+        elif len(params) == 1:
+            if task_data is not None:
+                expected_type = params[0].annotation
+                if expected_type != inspect.Parameter.empty and hasattr(
+                    expected_type, "model_validate"
+                ):
+                    task_input = expected_type.model_validate(task_data)
+                    result = handler(task_input)
+                else:
+                    result = handler(task_data)
             else:
                 result = handler(task_data)
+        # Multiple parameters
         else:
-            result = handler() if task_data is None else handler(task_data)
+            if isinstance(task_data, dict):
+                # Check if it's positional args format
+                if "args" in task_data and len(task_data) == 1:
+                    result = handler(*task_data["args"])
+                else:
+                    # Unpack dict as kwargs
+                    result = handler(**task_data)
+            else:
+                result = handler(task_data)
 
         # Handle output serialization
         if isinstance(result, BaseModel):

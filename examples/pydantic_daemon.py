@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pydantic validation example."""
 
-from task_daemon import TaskDaemon
+from task_daemon import DaemonBuilder
 from pydantic import BaseModel
 
 class EmailInput(BaseModel):
@@ -18,6 +18,7 @@ def send_email(task_data: EmailInput) -> EmailOutput:
     return EmailOutput(status="sent", message_id="msg-123")
 
 if __name__ == "__main__":
-    daemon = TaskDaemon()
-    daemon.register_handler(send_email)
+    daemon = (DaemonBuilder()
+              .add_handler(send_email)
+              .build())
     daemon.run()

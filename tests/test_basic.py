@@ -296,3 +296,42 @@ def test_pydantic_output_serialization():
 
         if os.path.exists("/tmp/test_pydantic_output.db"):
             os.remove("/tmp/test_pydantic_output.db")
+
+
+def test_multiple_parameter_handlers():
+    """Test handlers with multiple parameters."""
+
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    def greet(name: str, greeting: str = "Hello") -> str:
+        return f"{greeting}, {name}!"
+
+    def no_params() -> str:
+        return "called"
+
+    daemon = TaskDaemon()
+    daemon.register_handler(add)
+    daemon.register_handler(greet)
+    daemon.register_handler(no_params)
+
+    # Test multiple parameters with dict
+    result = daemon._invoke_handler(add, {"a": 5, "b": 3})
+    assert result == 8
+
+    # Test with default parameter
+    result = daemon._invoke_handler(greet, {"name": "World"})
+    assert result == "Hello, World!"
+
+    # Test override default
+    result = daemon._invoke_handler(greet, {"name": "Alice", "greeting": "Hi"})
+    assert result == "Hi, Alice!"
+
+    # Test no parameters
+    result = daemon._invoke_handler(no_params, {})
+    assert result == "called"
+
+    # Test positional args format
+    result = daemon._invoke_handler(add, {"args": (10, 20)})
+    assert result == 30
+

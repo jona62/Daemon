@@ -73,6 +73,41 @@ daemon.run()
 - ✅ Structured output serialization
 - ✅ Clear validation errors
 
+### Multiple Parameters
+
+```python
+from task_daemon import TaskDaemon
+
+def add(a: int, b: int) -> int:
+    """Handler with multiple parameters."""
+    return a + b
+
+def greet(name: str, greeting: str = "Hello") -> str:
+    """Handler with default parameter."""
+    return f"{greeting}, {name}!"
+
+daemon = TaskDaemon()
+daemon.register_handler(add)
+daemon.register_handler(greet)
+daemon.run()
+```
+
+Queue tasks with parameter dict:
+```python
+# Dict format
+client.queue_task("add", {"a": 5, "b": 3})  # Returns 8
+
+# Kwargs format
+client.queue_task("add", a=5, b=3)  # Returns 8
+
+# Positional args
+client.queue_task("add", 5, 3)  # Returns 8
+
+client.queue_task("greet", {"name": "World"})  # Returns "Hello, World!"
+client.queue_task("greet", name="World")  # Returns "Hello, World!"
+```
+
+
 ### Client Usage
 
 ```python

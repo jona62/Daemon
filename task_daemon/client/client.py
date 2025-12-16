@@ -2,10 +2,12 @@
 
 import requests
 import logging
-from typing import Optional, List
+from typing import Optional, List, Union, Dict, Any, TypeVar, overload
 from pydantic import BaseModel
 
 from .models import HealthStatus, TaskInfo, MetricsSummary
+
+T = TypeVar('T', bound=BaseModel)
 
 
 class DaemonClient:
@@ -16,23 +18,72 @@ class DaemonClient:
         self.timeout = timeout
         self.logger = logging.getLogger(__name__)
 
+    @overload
     def queue_task(
         self,
         task_type: str,
-        task_data: Optional[BaseModel] = None,
+        task_data: T,
+        *,
+        critical: bool = True
+    ) -> Optional[int]: ...
+
+    @overload
+    def queue_task(
+        self,
+        task_type: str,
+        task_data: Dict[str, Any],
+        *,
+        critical: bool = True
+    ) -> Optional[int]: ...
+
+    @overload
+    def queue_task(
+        self,
+        task_type: str,
+        *args: Any,
         critical: bool = True,
+        **kwargs: Any
+    ) -> Optional[int]: ...
+
+    def queue_task(
+        self,
+        task_type: str,
+        *args: Any,
+        critical: bool = True,
+        **kwargs: Any
     ) -> Optional[int]:
         """Queue a task for processing.
 
         Args:
             task_type: Type of task to process
-            task_data: Task data (any format)
+            *args: Positional arguments for the task handler
             critical: If True, raises exception on failure
+            **kwargs: Keyword arguments for the task handler
 
         Returns:
             Task ID if successful, None if failed (unless critical=True)
+        
+        Examples:
+            queue_task("add", MyClass(...))  # If defined with Pydantic like this MyClass(BaseModel)
+            queue_task("add", {"a": 1, "b": 2})  # Dict
+            queue_task("add", a=1, b=2)  # Kwargs
+            queue_task("add", 1, 2)  # Positional (converted to dict with param names)
         """
         try:
+            # Determine task_data format
+            if args and len(args) == 1 and isinstance(args[0], (dict, BaseModel)):
+                # Single dict or Pydantic model argument
+                task_data = args[0]
+            elif args:
+                # Multiple positional args - convert to dict
+                # Note: This requires the handler to accept **kwargs
+                task_data = {"args": args}
+            elif kwargs:
+                # Keyword arguments
+                task_data = kwargs
+            else:
+                task_data = None
+
             # Auto-serialize Pydantic models
             data = (
                 task_data.model_dump()
