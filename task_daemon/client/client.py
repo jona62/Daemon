@@ -2,10 +2,11 @@
 
 import requests
 import logging
-from typing import Optional, List, Union, Dict, Any, TypeVar, overload
+from typing import Optional, List, Dict, Any, TypeVar, overload
 from pydantic import BaseModel
 
 from .models import HealthStatus, TaskInfo, MetricsSummary
+from ..protocols import get_protocol, Protocol
 
 T = TypeVar('T', bound=BaseModel)
 
@@ -13,9 +14,15 @@ T = TypeVar('T', bound=BaseModel)
 class DaemonClient:
     """Client for interacting with TaskDaemon service."""
 
-    def __init__(self, daemon_url: str = "http://localhost:8080", timeout: float = 0.1):
+    def __init__(
+        self, 
+        daemon_url: str = "http://localhost:8080", 
+        timeout: float = 0.1,
+        protocol: str = "json"
+    ):
         self.daemon_url = daemon_url.rstrip("/")
         self.timeout = timeout
+        self.protocol: Protocol = get_protocol(f"application/{protocol}")
         self.logger = logging.getLogger(__name__)
 
     @overload
@@ -91,11 +98,21 @@ class DaemonClient:
                 else task_data
             )
             payload = {"type": task_type, "data": data}
+            
+            # Serialize with protocol
+            body = self.protocol.serialize(payload)
+            headers = {"Content-Type": self.protocol.content_type}
+            
             response = requests.post(
-                f"{self.daemon_url}/queue", json=payload, timeout=self.timeout
+                f"{self.daemon_url}/queue",
+                data=body,
+                headers=headers,
+                timeout=self.timeout
             )
             if response.status_code == 200:
-                return response.json().get("task_id")
+                # Deserialize response with same protocol
+                result = self.protocol.deserialize(response.content)
+                return result.get("task_id")
             else:
                 self.logger.warning(f"Failed to queue task: {response.status_code}")
                 if response.status_code == 422:

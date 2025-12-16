@@ -1,7 +1,7 @@
 """Main TaskDaemon implementation."""
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import PlainTextResponse, Response
 import threading
 import time
 import logging
@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from ..config import DaemonConfig
 from ..core.persistent_queue import PersistentQueue
 from ..core.queue import Queue
+from ..protocols import get_protocol
 from ..core.metrics import MetricsCollector
 from ..core.decorators import get_task_handler, register_handler
 
@@ -128,17 +129,39 @@ class TaskDaemon:
         async def api_metrics():
             return self.metrics.get_summary()
 
-        @self.app.post("/queue", response_model=TaskResponse, status_code=200)
-        async def enqueue(task_request: TaskRequest):
+        @self.app.post("/queue", status_code=200)
+        async def enqueue(request: Request):
             try:
-                # Use the data field directly, or fall back to empty dict
-                task_data = task_request.data or {}
+                # Get protocol from Content-Type header
+                content_type = request.headers.get("content-type", "application/json")
+                protocol = get_protocol(content_type)
+                
+                # Deserialize request body
+                body = await request.body()
+                data = protocol.deserialize(body)
+                
+                # Extract task type and data
+                task_type = data.get("type")
+                task_data = data.get("data") or {}
+                
+                if not task_type:
+                    raise HTTPException(status_code=400, detail="Missing task type")
 
-                task_id = self.queue.enqueue(task_request.type, task_data)
+                task_id = self.queue.enqueue(task_type, task_data)
                 self.metrics.task_received()
                 self.metrics.update_queue_size(self.queue.size())
-                self.logger.info(f"Task {task_id} queued: {task_request.type}")
-                return TaskResponse(task_id=task_id)
+                self.logger.info(f"Task {task_id} queued: {task_type}")
+                
+                # Serialize response with same protocol
+                response_data = {"task_id": task_id}
+                response_body = protocol.serialize(response_data)
+                
+                return Response(
+                    content=response_body,
+                    media_type=protocol.content_type
+                )
+            except HTTPException:
+                raise
             except Exception as e:
                 self.logger.error(f"Error enqueueing: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
