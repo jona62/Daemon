@@ -8,7 +8,9 @@ import time
 client = DaemonClient("http://localhost:8080", timeout=5.0)
 
 # Queue tasks
-func_input = EmailInput(recipient="user@example.com", subject="Hello", body="Test message")
+func_input = EmailInput(
+    recipient="user@example.com", subject="Hello", body="Test message"
+)
 task_id = client.queue_task("send_email", func_input)
 print(f"Queued task: {task_id}")
 

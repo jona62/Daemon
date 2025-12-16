@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package taskdaemon;
+
+// TaskDaemon gRPC service
+service TaskDaemon {
+  // Queue a new task
+  rpc QueueTask(TaskRequest) returns (TaskResponse);
+  
+  // Get task status and result
+  rpc GetTask(TaskIdRequest) returns (TaskInfo);
+  
+  // Get health status
+  rpc GetHealth(Empty) returns (HealthStatus);
+  
+  // Get metrics
+  rpc GetMetrics(Empty) returns (MetricsSummary);
+  
+  // List recent tasks
+  rpc ListTasks(ListTasksRequest) returns (TaskList);
+  
+  // Delete a task
+  rpc DeleteTask(TaskIdRequest) returns (DeleteResponse);
+  
+  // Redrive a failed task
+  rpc RedriveTask(TaskIdRequest) returns (RedriveResponse);
+}
+
+// Empty message for requests with no parameters
+message Empty {}
+
+// Task request - using JSON string for flexibility
+message TaskRequest {
+  string task_type = 1;
+  string task_data_json = 2;  // JSON string - simple and universal
+}
+
+// Task response
+message TaskResponse {
+  int32 task_id = 1;
+}
+
+// Task ID request
+message TaskIdRequest {
+  int32 task_id = 1;
+}
+
+// Task information
+message TaskInfo {
+  int32 id = 1;
+  string task_type = 2;
+  string task_data = 3;
+  string status = 4;
+  string created_at = 5;
+  string completed_at = 6;
+  int32 attempts = 7;
+  string last_error = 8;
+  string result = 9;
+}
+
+// Health status
+message HealthStatus {
+  string status = 1;
+  int32 queue_size = 2;
+  string timestamp = 3;
+  int32 workers = 4;
+}
+
+// Metrics summary
+message MetricsSummary {
+  double tasks_received = 1;
+  double tasks_processed_success = 2;
+  double tasks_processed_failed = 3;
+  double queue_size = 4;
+  bool daemon_healthy = 5;
+}
+
+// List tasks request
+message ListTasksRequest {
+  int32 limit = 1;
+}
+
+// Task list
+message TaskList {
+  repeated TaskInfo tasks = 1;
+}
+
+// Delete response
+message DeleteResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Redrive response
+message RedriveResponse {
+  bool success = 1;
+  string message = 2;
+}

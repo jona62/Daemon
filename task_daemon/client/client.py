@@ -8,17 +8,17 @@ from pydantic import BaseModel
 from .models import HealthStatus, TaskInfo, MetricsSummary
 from ..protocols import get_protocol, Protocol
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 
 class DaemonClient:
     """Client for interacting with TaskDaemon service."""
 
     def __init__(
-        self, 
-        daemon_url: str = "http://localhost:8080", 
+        self,
+        daemon_url: str = "http://localhost:8080",
         timeout: float = 0.1,
-        protocol: str = "json"
+        protocol: str = "json",
     ):
         self.daemon_url = daemon_url.rstrip("/")
         self.timeout = timeout
@@ -27,37 +27,21 @@ class DaemonClient:
 
     @overload
     def queue_task(
-        self,
-        task_type: str,
-        task_data: T,
-        *,
-        critical: bool = True
+        self, task_type: str, task_data: T, *, critical: bool = True
     ) -> Optional[int]: ...
 
     @overload
     def queue_task(
-        self,
-        task_type: str,
-        task_data: Dict[str, Any],
-        *,
-        critical: bool = True
+        self, task_type: str, task_data: Dict[str, Any], *, critical: bool = True
     ) -> Optional[int]: ...
 
     @overload
     def queue_task(
-        self,
-        task_type: str,
-        *args: Any,
-        critical: bool = True,
-        **kwargs: Any
+        self, task_type: str, *args: Any, critical: bool = True, **kwargs: Any
     ) -> Optional[int]: ...
 
     def queue_task(
-        self,
-        task_type: str,
-        *args: Any,
-        critical: bool = True,
-        **kwargs: Any
+        self, task_type: str, *args: Any, critical: bool = True, **kwargs: Any
     ) -> Optional[int]:
         """Queue a task for processing.
 
@@ -69,7 +53,7 @@ class DaemonClient:
 
         Returns:
             Task ID if successful, None if failed (unless critical=True)
-        
+
         Examples:
             queue_task("add", MyClass(...))  # If defined with Pydantic like this MyClass(BaseModel)
             queue_task("add", {"a": 1, "b": 2})  # Dict
@@ -98,16 +82,16 @@ class DaemonClient:
                 else task_data
             )
             payload = {"type": task_type, "data": data}
-            
+
             # Serialize with protocol
             body = self.protocol.serialize(payload)
             headers = {"Content-Type": self.protocol.content_type}
-            
+
             response = requests.post(
                 f"{self.daemon_url}/queue",
                 data=body,
                 headers=headers,
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             if response.status_code == 200:
                 # Deserialize response with same protocol

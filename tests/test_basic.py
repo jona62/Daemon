@@ -334,4 +334,3 @@ def test_multiple_parameter_handlers():
     # Test positional args format
     result = daemon._invoke_handler(add, {"args": (10, 20)})
     assert result == 30
-

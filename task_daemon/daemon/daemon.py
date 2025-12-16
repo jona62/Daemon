@@ -135,15 +135,15 @@ class TaskDaemon:
                 # Get protocol from Content-Type header
                 content_type = request.headers.get("content-type", "application/json")
                 protocol = get_protocol(content_type)
-                
+
                 # Deserialize request body
                 body = await request.body()
                 data = protocol.deserialize(body)
-                
+
                 # Extract task type and data
                 task_type = data.get("type")
                 task_data = data.get("data") or {}
-                
+
                 if not task_type:
                     raise HTTPException(status_code=400, detail="Missing task type")
 
@@ -151,15 +151,12 @@ class TaskDaemon:
                 self.metrics.task_received()
                 self.metrics.update_queue_size(self.queue.size())
                 self.logger.info(f"Task {task_id} queued: {task_type}")
-                
+
                 # Serialize response with same protocol
                 response_data = {"task_id": task_id}
                 response_body = protocol.serialize(response_data)
-                
-                return Response(
-                    content=response_body,
-                    media_type=protocol.content_type
-                )
+
+                return Response(content=response_body, media_type=protocol.content_type)
             except HTTPException:
                 raise
             except Exception as e:
@@ -272,7 +269,7 @@ class TaskDaemon:
         return self
 
     def run(self, **kwargs):
-        """Run the daemon server."""
+        """Run the daemon server (HTTP only)."""
         self.start_workers()
         self.metrics.set_health(True)
 
@@ -286,5 +283,26 @@ class TaskDaemon:
         try:
             uvicorn.run(self.app, **uvicorn_kwargs)
         finally:
+            self.stop_workers()
+            self.metrics.set_health(False)
+
+    def run_with_grpc(self, grpc_port: int = 50051, grpc_protocol: str = "json"):
+        """Run the daemon with gRPC server only."""
+        from ..grpc_service import serve_grpc
+
+        self.start_workers()
+        self.metrics.set_health(True)
+
+        grpc_server = serve_grpc(self, port=grpc_port, protocol=grpc_protocol)
+        self.logger.info(
+            f"gRPC server started on port {grpc_port} with {grpc_protocol} protocol"
+        )
+
+        try:
+            grpc_server.wait_for_termination()
+        except KeyboardInterrupt:
+            self.logger.info("Shutting down gRPC server...")
+        finally:
+            grpc_server.stop(grace=5)
             self.stop_workers()
             self.metrics.set_health(False)

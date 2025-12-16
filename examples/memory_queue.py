@@ -3,8 +3,10 @@
 
 from task_daemon import TaskDaemon, DaemonConfig, MemoryQueue
 
+
 def process_task(event):
     return {"status": "done"}
+
 
 config = DaemonConfig(port=8082)
 daemon = TaskDaemon(config, queue=MemoryQueue())

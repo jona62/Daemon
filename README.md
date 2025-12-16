@@ -10,6 +10,9 @@ A configurable task processing system with monitoring, built with FastAPI.
 - 🔄 **Persistent**: SQLite queue with retry logic
 - 🧵 **Multi-threaded**: Configurable worker threads
 - ⚡ **FastAPI**: High-performance async API with OpenAPI docs
+- 🚀 **gRPC Support**: Multi-language clients via Protocol Buffers
+- 📦 **Protocol Options**: JSON or MessagePack serialization
+- 🌍 **Multi-Language**: Use from Python, Kotlin, Go, Java, C++, and more
 - 🐳 **Docker Ready**: Complete Docker and Docker Compose support
 
 ## Quick Start
@@ -132,6 +135,55 @@ health = client.health_check()
 print(f"Queue size: {health.queue_size}")
 ```
 
+### gRPC Client (Multi-Language)
+
+**Python:**
+```python
+from task_daemon.client.grpc_client import GRPCDaemonClient
+
+with GRPCDaemonClient("localhost:50051") as client:
+    task_id = client.queue_task("send_email", {
+        "recipient": "user@example.com"
+    })
+    task = client.get_task(task_id)
+```
+
+**Kotlin:**
+```kotlin
+val client = TaskDaemonGrpcKt.TaskDaemonCoroutineStub(channel)
+val request = taskRequest {
+    taskType = "send_email"
+    taskDataJson = """{"recipient": "user@example.com"}"""
+}
+val response = client.queueTask(request)
+```
+
+See [clients/](clients/) for complete examples in multiple languages.
+
+### Protocol Options
+
+**HTTP with JSON (default):**
+```python
+client = DaemonClient("http://localhost:8080", protocol="json")
+```
+
+**HTTP with MessagePack (3-5x faster):**
+```python
+client = DaemonClient("http://localhost:8080", protocol="msgpack")
+```
+
+**gRPC with JSON:**
+```python
+daemon.run_with_grpc(grpc_port=50051, grpc_protocol="json")
+```
+
+**gRPC with MessagePack:**
+```python
+daemon.run_with_grpc(grpc_port=50051, grpc_protocol="msgpack")
+```
+
+See [docs/PROTOCOLS.md](docs/PROTOCOLS.md) for performance benchmarks.
+
 ## Configuration
 
 ### Environment Variables
@@ -164,6 +216,41 @@ daemon.run()
 
 ```bash
 task-daemon --workers 4 --port 8080 --log-level INFO
+```
+
+## Server Modes
+
+### HTTP Server (Default)
+
+```python
+daemon = TaskDaemon()
+daemon.register_handler(my_handler)
+daemon.run()  # HTTP on port 8080
+```
+
+### gRPC Server
+
+```python
+daemon = TaskDaemon()
+daemon.register_handler(my_handler)
+daemon.run_with_grpc(grpc_port=50051, grpc_protocol="json")  # gRPC only
+```
+
+### Both HTTP and gRPC
+
+```python
+import threading
+from task_daemon.grpc_service import serve_grpc
+
+daemon = TaskDaemon()
+daemon.register_handler(my_handler)
+
+# Start gRPC in background
+grpc_server = serve_grpc(daemon, port=50051, protocol="json")
+daemon.start_workers()
+
+# Start HTTP in foreground
+daemon.run()
 ```
 
 ## Queue Types
@@ -236,6 +323,38 @@ DAEMON_WORKERS=8
 DAEMON_LOG_LEVEL=DEBUG
 ```
 
+## Multi-Language Clients
+
+TaskDaemon supports clients in any language via gRPC:
+
+### Kotlin Client
+
+```bash
+cd clients/kotlin
+./gradlew run
+```
+
+Full example with:
+- Type-safe data classes
+- Jackson JSON serialization
+- Coroutine-based async operations
+
+See [clients/kotlin/README.md](clients/kotlin/README.md)
+
+### Other Languages
+
+The same `.proto` file enables clients in:
+- **Go** - High-performance microservices
+- **Java** - Enterprise applications
+- **C++** - Low-level systems
+- **C#** - .NET applications
+- **Node.js** - JavaScript/TypeScript
+- **Ruby** - Rails applications
+- **PHP** - Web applications
+- **Dart** - Flutter mobile apps
+
+See [clients/README.md](clients/README.md) for details.
+
 ## Examples
 
 ```bash
@@ -268,6 +387,9 @@ pytest
 
 # Format
 black task_daemon/
+
+# Regenerate protobuf files (after modifying .proto)
+python generate_proto.py
 ```
 
 ## Architecture

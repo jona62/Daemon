@@ -3,6 +3,7 @@
 from .daemon import TaskDaemon
 from .daemon.builder import DaemonBuilder
 from .client import DaemonClient
+from .client.grpc_client import GRPCDaemonClient
 from .config import DaemonConfig
 from .core import task_handler, get_all_handlers, Queue, PersistentQueue, MemoryQueue
 
@@ -11,6 +12,7 @@ __all__ = [
     "TaskDaemon",
     "DaemonBuilder",
     "DaemonClient",
+    "GRPCDaemonClient",
     "DaemonConfig",
     "task_handler",
     "get_all_handlers",

@@ -31,23 +31,23 @@ def benchmark_protocol(protocol, data, iterations=1000):
     for _ in range(10):
         serialized = protocol.serialize(data)
         protocol.deserialize(serialized)
-    
+
     # Serialize benchmark
     start = time.perf_counter()
     for _ in range(iterations):
         serialized = protocol.serialize(data)
     serialize_time = time.perf_counter() - start
-    
+
     # Deserialize benchmark
     serialized = protocol.serialize(data)
     start = time.perf_counter()
     for _ in range(iterations):
         protocol.deserialize(serialized)
     deserialize_time = time.perf_counter() - start
-    
+
     # Size
     size = len(serialized)
-    
+
     return {
         "serialize_time": serialize_time,
         "deserialize_time": deserialize_time,
@@ -61,13 +61,13 @@ def benchmark_protocol(protocol, data, iterations=1000):
 def test_protocol_benchmark_small():
     """Benchmark protocols with small data."""
     data = generate_test_data("small")
-    
+
     json_protocol = JSONProtocol()
     msgpack_protocol = MessagePackProtocol()
-    
+
     json_results = benchmark_protocol(json_protocol, data)
     msgpack_results = benchmark_protocol(msgpack_protocol, data)
-    
+
     print("\n" + "=" * 70)
     print("SMALL DATA BENCHMARK")
     print("=" * 70)
@@ -83,27 +83,33 @@ def test_protocol_benchmark_small():
     print(f"  Total:       {msgpack_results['total_time']:.4f}s")
     print(f"  Size:        {msgpack_results['size']} bytes")
     print(f"\nSpeedup:")
-    print(f"  Serialize:   {json_results['serialize_time'] / msgpack_results['serialize_time']:.2f}x")
-    print(f"  Deserialize: {json_results['deserialize_time'] / msgpack_results['deserialize_time']:.2f}x")
-    print(f"  Total:       {json_results['total_time'] / msgpack_results['total_time']:.2f}x")
+    print(
+        f"  Serialize:   {json_results['serialize_time'] / msgpack_results['serialize_time']:.2f}x"
+    )
+    print(
+        f"  Deserialize: {json_results['deserialize_time'] / msgpack_results['deserialize_time']:.2f}x"
+    )
+    print(
+        f"  Total:       {json_results['total_time'] / msgpack_results['total_time']:.2f}x"
+    )
     print(f"  Size:        {json_results['size'] / msgpack_results['size']:.2f}x")
-    
+
     # Assertions
-    assert msgpack_results['total_time'] < json_results['total_time']
-    assert msgpack_results['size'] <= json_results['size']
+    assert msgpack_results["total_time"] < json_results["total_time"]
+    assert msgpack_results["size"] <= json_results["size"]
 
 
 @pytest.mark.benchmark
 def test_protocol_benchmark_medium():
     """Benchmark protocols with medium data."""
     data = generate_test_data("medium")
-    
+
     json_protocol = JSONProtocol()
     msgpack_protocol = MessagePackProtocol()
-    
+
     json_results = benchmark_protocol(json_protocol, data)
     msgpack_results = benchmark_protocol(msgpack_protocol, data)
-    
+
     print("\n" + "=" * 70)
     print("MEDIUM DATA BENCHMARK")
     print("=" * 70)
@@ -118,26 +124,32 @@ def test_protocol_benchmark_medium():
     print(f"  Total:       {msgpack_results['total_time']:.4f}s")
     print(f"  Size:        {msgpack_results['size']} bytes")
     print(f"\nSpeedup:")
-    print(f"  Serialize:   {json_results['serialize_time'] / msgpack_results['serialize_time']:.2f}x")
-    print(f"  Deserialize: {json_results['deserialize_time'] / msgpack_results['deserialize_time']:.2f}x")
-    print(f"  Total:       {json_results['total_time'] / msgpack_results['total_time']:.2f}x")
+    print(
+        f"  Serialize:   {json_results['serialize_time'] / msgpack_results['serialize_time']:.2f}x"
+    )
+    print(
+        f"  Deserialize: {json_results['deserialize_time'] / msgpack_results['deserialize_time']:.2f}x"
+    )
+    print(
+        f"  Total:       {json_results['total_time'] / msgpack_results['total_time']:.2f}x"
+    )
     print(f"  Size:        {json_results['size'] / msgpack_results['size']:.2f}x")
-    
-    assert msgpack_results['total_time'] < json_results['total_time']
-    assert msgpack_results['size'] < json_results['size']
+
+    assert msgpack_results["total_time"] < json_results["total_time"]
+    assert msgpack_results["size"] < json_results["size"]
 
 
 @pytest.mark.benchmark
 def test_protocol_benchmark_large():
     """Benchmark protocols with large data."""
     data = generate_test_data("large")
-    
+
     json_protocol = JSONProtocol()
     msgpack_protocol = MessagePackProtocol()
-    
+
     json_results = benchmark_protocol(json_protocol, data, iterations=100)
     msgpack_results = benchmark_protocol(msgpack_protocol, data, iterations=100)
-    
+
     print("\n" + "=" * 70)
     print("LARGE DATA BENCHMARK")
     print("=" * 70)
@@ -152,14 +164,20 @@ def test_protocol_benchmark_large():
     print(f"  Total:       {msgpack_results['total_time']:.4f}s")
     print(f"  Size:        {msgpack_results['size']} bytes")
     print(f"\nSpeedup:")
-    print(f"  Serialize:   {json_results['serialize_time'] / msgpack_results['serialize_time']:.2f}x")
-    print(f"  Deserialize: {json_results['deserialize_time'] / msgpack_results['deserialize_time']:.2f}x")
-    print(f"  Total:       {json_results['total_time'] / msgpack_results['total_time']:.2f}x")
+    print(
+        f"  Serialize:   {json_results['serialize_time'] / msgpack_results['serialize_time']:.2f}x"
+    )
+    print(
+        f"  Deserialize: {json_results['deserialize_time'] / msgpack_results['deserialize_time']:.2f}x"
+    )
+    print(
+        f"  Total:       {json_results['total_time'] / msgpack_results['total_time']:.2f}x"
+    )
     print(f"  Size:        {json_results['size'] / msgpack_results['size']:.2f}x")
     print("=" * 70)
-    
-    assert msgpack_results['total_time'] < json_results['total_time']
-    assert msgpack_results['size'] < json_results['size']
+
+    assert msgpack_results["total_time"] < json_results["total_time"]
+    assert msgpack_results["size"] < json_results["size"]
 
 
 def test_protocol_correctness():
@@ -173,15 +191,15 @@ def test_protocol_correctness():
         "list": [1, 2, 3],
         "dict": {"nested": "value"},
     }
-    
+
     json_protocol = JSONProtocol()
     msgpack_protocol = MessagePackProtocol()
-    
+
     # JSON roundtrip
     json_serialized = json_protocol.serialize(test_data)
     json_deserialized = json_protocol.deserialize(json_serialized)
     assert json_deserialized == test_data
-    
+
     # MessagePack roundtrip
     msgpack_serialized = msgpack_protocol.serialize(test_data)
     msgpack_deserialized = msgpack_protocol.deserialize(msgpack_serialized)
